@@ -40,7 +40,22 @@ impl<T: Debug + Display + PartialOrd> BinaryTree<T> {
   }
 
   pub fn insert(&mut self, t: T) {
-    unimplemented!()
+    match self {
+      BinaryTree::Leaf => { 
+        *self = BinaryTree::Node(
+          t, 
+          Box::new(BinaryTree::Leaf), 
+          Box::new(BinaryTree::Leaf)
+        )
+      },
+      BinaryTree::Node(x, l, r) => {
+        if t < *x {
+          l.insert(t)
+        } else if t > *x {
+          r.insert(t)
+        }
+      }
+    }
   }
 
   pub fn search(&self, query: &T) -> Option<&T> {
