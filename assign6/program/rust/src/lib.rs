@@ -59,7 +59,21 @@ impl<T: Debug + Display + PartialOrd> BinaryTree<T> {
   }
 
   pub fn search(&self, query: &T) -> Option<&T> {
-    unimplemented!()
+    match self {
+      BinaryTree::Leaf => None,
+      BinaryTree::Node(x, l, r) => {
+        match l.search(query) {
+          Some(y) => Some(y),
+          None => {
+            if *x >= *query {
+              Some(x)
+            } else {
+              r.search(query)
+            }
+          }
+        }
+      }
+    }
   }
 
   pub fn rebalance(&mut self) {
