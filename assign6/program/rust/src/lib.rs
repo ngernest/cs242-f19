@@ -26,7 +26,17 @@ impl<T: Debug + Display + PartialOrd> BinaryTree<T> {
   }
 
   pub fn sorted(&self) -> bool {
-    unimplemented!()
+    match self {
+      BinaryTree::Leaf => true,
+      BinaryTree::Node(x, l, r) => { 
+        let ls = l.to_vec();
+        let rs = r.to_vec();
+        l.sorted() 
+        && r.sorted() 
+        && ls.iter().all(|&y| *y < *x)
+        && rs.iter().all(|&z| *z > *x)
+      }
+    }
   }
 
   pub fn insert(&mut self, t: T) {
