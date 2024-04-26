@@ -9,11 +9,20 @@ pub enum BinaryTree<T> {
 
 impl<T: Debug + Display + PartialOrd> BinaryTree<T> {
   pub fn len(&self) -> usize {
-    unimplemented!()
+    match self {
+      BinaryTree::Leaf => 0,
+      BinaryTree::Node(_x, l, r) => 
+      1 + l.len() + r.len()
+    }
   }
 
   pub fn to_vec(&self) -> Vec<&T> {
-    unimplemented!()
+    match self {
+      BinaryTree::Leaf => vec![],
+      BinaryTree::Node(x, l, r) => {
+        [l.to_vec(), vec![x], r.to_vec()].concat()
+      }
+    }
   }
 
   pub fn sorted(&self) -> bool {
