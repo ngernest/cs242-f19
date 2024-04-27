@@ -77,7 +77,17 @@ impl<T: Debug + Display + PartialOrd> BinaryTree<T> {
   }
 
   pub fn rebalance(&mut self) {
-    unimplemented!()
+    match self {
+      BinaryTree::Leaf => (),
+      BinaryTree::Node(
+        x, 
+        l, 
+        r
+      ) => {
+        let balance_factor = l.len() - r.len();
+
+      }
+    }
   }
 
 
