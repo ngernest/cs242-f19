@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use take_mut;
 
 /*
@@ -123,10 +125,18 @@ where
 
     fn poll(&mut self) -> Poll<Self::Item> {
         match self {
-            Join::BothRunning(f, g) => unimplemented!(),
-            Join::FirstDone(f_item, g) => unimplemented!(),
-            Join::SecondDone(f, g_item) => unimplemented!(),
+            Join::FirstDone(ref mut f_item, g) => {
+                if let Poll::Ready(g_item) = g.poll() {
+                    let mut res = None;
+                    take_mut::take(self, |_| Join::Done);
+                    res = Some(f_item);
+                    Poll::Ready((res.take().unwrap(), g_item))
+                } else {
+                    Poll::NotReady
+                }
+            }
             Join::Done => panic!("poll is called on a Future that has already been completed"),
+            _ => unimplemented!(),
         }
     }
 }
