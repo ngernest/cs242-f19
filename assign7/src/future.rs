@@ -1,4 +1,4 @@
-use std::ops::Deref;
+#![allow(dead_code, unused_imports)]
 
 use take_mut;
 
@@ -82,7 +82,7 @@ where
         match self.fut.poll() {
             Poll::NotReady => Poll::NotReady,
             Poll::Ready(s) => {
-                let f = self.fun.take();
+                let f: Option<Fun> = self.fun.take();
                 Poll::Ready(f.unwrap()(s))
             }
         }
@@ -124,20 +124,38 @@ where
     type Item = (F::Item, G::Item);
 
     fn poll(&mut self) -> Poll<Self::Item> {
-        match self {
-            Join::FirstDone(ref mut f_item, g) => {
-                if let Poll::Ready(g_item) = g.poll() {
-                    let mut res = None;
-                    take_mut::take(self, |_| Join::Done);
-                    res = Some(f_item);
-                    Poll::Ready((res.take().unwrap(), g_item))
-                } else {
-                    Poll::NotReady
+        // Since we can't return the `Poll` result directly inside
+        // the `take` closure, we have to store it in a mutable variable,
+        // which we'll modify inside the closure
+        let mut poll_result = Poll::NotReady;
+
+        take_mut::take(self, |this| match this {
+            Join::FirstDone(f_item, mut g) => match g.poll() {
+                Poll::Ready(g_item) => {
+                    poll_result = Poll::Ready((f_item, g_item));
+                    Join::Done
                 }
-            }
-            Join::Done => panic!("poll is called on a Future that has already been completed"),
-            _ => unimplemented!(),
-        }
+                Poll::NotReady => Join::FirstDone(f_item, g),
+            },
+            Join::SecondDone(mut f, g_item) => match f.poll() {
+                Poll::Ready(f_item) => {
+                    poll_result = Poll::Ready((f_item, g_item));
+                    Join::Done
+                }
+                Poll::NotReady => Join::SecondDone(f, g_item),
+            },
+            Join::BothRunning(mut f, mut g) => match (f.poll(), g.poll()) {
+                (Poll::Ready(f_item), Poll::Ready(g_item)) => {
+                    poll_result = Poll::Ready((f_item, g_item));
+                    Join::Done
+                }
+                (Poll::Ready(f_item), Poll::NotReady) => Join::FirstDone(f_item, g),
+                (Poll::NotReady, Poll::Ready(g_item)) => Join::SecondDone(f, g_item),
+                (Poll::NotReady, Poll::NotReady) => Join::BothRunning(f, g),
+            },
+            Join::Done => panic!("poll called after future completed"),
+        });
+        poll_result
     }
 }
 
@@ -170,6 +188,37 @@ where
     type Item = Fut2::Item;
 
     fn poll(&mut self) -> Poll<Self::Item> {
-        unimplemented!()
+        let mut poll_result = Poll::NotReady;
+
+        take_mut::take(self, |this| {
+            match this {
+                // Note the use of the `mut` identifier pattern,
+                // which allows the call `first.poll()` to be possible
+                // (since it requires mutable ownership of `first`)
+                AndThen::First(mut first, f) => {
+                    match first.poll() {
+                        Poll::Ready(item) => {
+                            let mut second = f(item);
+                            // Recursively poll the new future
+                            poll_result = second.poll();
+                            AndThen::Done
+                        }
+                        Poll::NotReady => AndThen::First(first, f),
+                    }
+                }
+                AndThen::Second(mut second) => match second.poll() {
+                    Poll::Ready(item) => {
+                        poll_result = Poll::Ready(item);
+                        AndThen::Done
+                    }
+                    Poll::NotReady => AndThen::Second(second),
+                },
+                AndThen::Done => {
+                    panic!("poll called after future completed")
+                }
+            }
+        });
+
+        poll_result
     }
 }
