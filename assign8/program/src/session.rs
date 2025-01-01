@@ -216,7 +216,7 @@ where
 }
 
 impl<Env, S> Chan<Env, Rec<S>> {
-  /// Enter a recursive session
+  /// Enters a recursive session
   /// (pushes the crurent session type `S` onto the `Env` stack)
   pub fn rec_push(self) -> Chan<(S, Env), S> {
     unsafe { transmute(self) }
@@ -224,8 +224,8 @@ impl<Env, S> Chan<Env, Rec<S>> {
 }
 
 impl<Env, S> Chan<(S, Env), Var<Z>> {
-  /// Leaves a recursive session
-  /// (removes the current sesison type `S` from the `Env` stack)
+  /// Leaves a recursive session when we reach the closest recursion point (`Z`).
+  /// Effectively, this removes the current sesison type `S` from the `Env` stack.
   pub fn rec_pop(self) -> Chan<(S, Env), S> {
     unsafe { transmute(self) }
   }
@@ -233,6 +233,7 @@ impl<Env, S> Chan<(S, Env), Var<Z>> {
 
 impl<Env, Sigma, N> Chan<(Sigma, Env), Var<S<N>>> {
   /// Leaves a recursive session
+  /// (note that we go from the De Bruijn index `S<N>` to just `N`)
   pub fn rec_pop(self) -> Chan<Env, Var<N>> {
     unsafe { transmute(self) }
   }

@@ -20,7 +20,7 @@ pub struct Fin;
 pub type TCPHandshake<TCPRecv> = Recv<Syn, Send<SynAck, Recv<Ack, TCPRecv>>>;
 
 /// Data transfer phase
-pub type TCPRecv<TCPClose> = Recv<Vec<Packet>, Send<Vec<usize>, Offer<TCPClose, Var<Z>>>>;
+pub type TCPRecv<TCPClose> = Rec<Recv<Vec<Packet>, Send<Vec<usize>, Offer<TCPClose, Var<Z>>>>>;
 
 /// Close phase
 pub type TCPClose = Send<Ack, Send<Fin, Recv<Ack, Close>>>;
