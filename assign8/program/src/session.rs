@@ -27,8 +27,12 @@ pub struct Offer<Left, Right>(PhantomData<(Left, Right)>);
 pub struct Choose<Left, Right>(PhantomData<(Left, Right)>);
 pub struct Close;
 pub struct Rec<S>(PhantomData<S>);
+
+/// Peano numerals
 pub struct Z;
 pub struct S<N>(PhantomData<N>);
+
+/// De Bruijn indices, where `N` is a Peano numeral
 pub struct Var<N>(PhantomData<N>);
 
 pub trait HasDual {
@@ -88,6 +92,8 @@ where
   type Dual = Rec<S::Dual>;
 }
 
+/// Channels are parameterized by an environment `Env` and a session type `S`
+/// (`Env` is a mapping from De Bruijn indices to session types)
 pub struct Chan<Env, S> {
   pub sender: Sender<Box<u8>>,
   pub receiver: Receiver<Box<u8>>,
@@ -210,18 +216,23 @@ where
 }
 
 impl<Env, S> Chan<Env, Rec<S>> {
+  /// Enter a recursive session
+  /// (pushes the crurent session type `S` onto the `Env` stack)
   pub fn rec_push(self) -> Chan<(S, Env), S> {
     unsafe { transmute(self) }
   }
 }
 
 impl<Env, S> Chan<(S, Env), Var<Z>> {
+  /// Leaves a recursive session
+  /// (removes the current sesison type `S` from the `Env` stack)
   pub fn rec_pop(self) -> Chan<(S, Env), S> {
     unsafe { transmute(self) }
   }
 }
 
 impl<Env, Sigma, N> Chan<(Sigma, Env), Var<S<N>>> {
+  /// Leaves a recursive session
   pub fn rec_pop(self) -> Chan<Env, Var<N>> {
     unsafe { transmute(self) }
   }

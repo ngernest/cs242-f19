@@ -16,11 +16,14 @@ pub struct Ack;
 /// Close connection
 pub struct Fin;
 
-pub type TCPHandshake<TCPRecv> = ();
+/// Handshake phase
+pub type TCPHandshake<TCPRecv> = Recv<Syn, Send<SynAck, Recv<Ack, TCPRecv>>>;
 
-pub type TCPRecv<TCPClose> = ();
+/// Data transfer phase
+pub type TCPRecv<TCPClose> = Recv<Vec<Packet>, Send<Vec<usize>, Offer<TCPClose, Var<Z>>>>;
 
-pub type TCPClose = ();
+/// Close phase
+pub type TCPClose = Send<Ack, Send<Fin, Recv<Ack, Close>>>;
 
 pub type TCPServer = TCPHandshake<TCPRecv<TCPClose>>;
 

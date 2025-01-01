@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::session::*;
 
 type Server = Rec<Recv<String, Offer<Var<Z>, Close>>>;
