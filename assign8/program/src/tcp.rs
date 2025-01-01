@@ -1,4 +1,4 @@
-#![allow(unused_imports, unused_variables)]
+#![allow(unused_imports, unused_variables, unused_parens)]
 extern crate rand;
 
 use crate::session::*;
@@ -29,23 +29,74 @@ pub type TCPServer = TCPHandshake<TCPRecv<TCPClose>>;
 
 pub type TCPClient = <TCPServer as HasDual>::Dual;
 
+/// Projects the `seqno` field for each packet in a vector of packets
+fn get_seq_nums(packets: &Vec<Packet>) -> Vec<usize> {
+  packets.iter().map(|pk| pk.seqno).collect()
+}
+
+fn get_buffers(packets: &Vec<Packet>) -> Vec<Buffer> {
+  packets.iter().map(|pk| pk.buf.clone()).collect()
+}
+
 pub fn tcp_server(c: Chan<(), TCPServer>) -> Vec<Buffer> {
-  unimplemented!();
+  // Handshake
+  let (c, syn) = c.recv();
+  let c = c.send(SynAck);
+  let (c, ack) = c.recv();
+
+  // Data transfer
+  let c = c.rec_push();
+  loop {
+    let (c, mut packets) = c.recv();
+    let seq_nums = get_seq_nums(&packets);
+    let c = c.send(seq_nums);
+
+    match c.offer() {
+      Branch::Left(c) => {
+        // Close connection
+        let c = c.send(Ack);
+        let c = c.send(Fin);
+        let (c, ack) = c.recv();
+        c.close();
+
+        // Sort packets in increasing order of `seqno`
+        packets.sort_by(|p1, p2| p1.seqno.cmp(&p2.seqno));
+
+        // Project out all the buffers
+        let buffers = get_buffers(&packets);
+        return buffers;
+      }
+      Branch::Right(c) => {
+        // Recurse
+        todo!()
+      }
+    }
+  }
 }
 
 pub fn tcp_client(c: Chan<(), TCPClient>, bufs: Vec<Buffer>) {
-  unimplemented!();
+  // let mut c = c.send(Syn);
+  // let (mut c, syn_ack) = c.recv();
+  // c = c.send(Ack);
+
+  // for (seqno, buffer) in bufs.iter().enumerate() {
+  //   let packet = Packet {
+  //     buf: buffer.to_vec(),
+  //     seqno,
+  //   };
+  //   c.send(packet)
+  // }
 }
 
 #[cfg(test)]
 mod test {
+  use crate::session::NOISY;
+  use crate::session::*;
+  use crate::tcp::*;
   use rand;
   use rand::Rng;
-  use session::NOISY;
-  use session::*;
   use std::sync::atomic::Ordering;
   use std::thread;
-  use tcp::*;
 
   fn gen_bufs() -> Vec<Buffer> {
     let mut bufs: Vec<Buffer> = Vec::new();

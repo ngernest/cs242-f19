@@ -140,6 +140,7 @@ impl<Env, S> Chan<Env, S> {
 }
 
 impl<Env> Chan<Env, Close> {
+  /// Closes the channel
   pub fn close(self) {}
 }
 
@@ -258,7 +259,7 @@ impl<Env, S> Chan<Env, Rec<S>> {
 
 impl<Env, S> Chan<(S, Env), Var<Z>> {
   /// Leaves a recursive session when we reach the closest recursion point (`Z`).
-  /// Effectively, this removes the current sesison type `S` from the `Env` stack.
+  /// Effectively, this removes the current sessino type `S` from the `Env` stack.
   pub fn rec_pop(self) -> Chan<(S, Env), S> {
     unsafe { transmute(self) }
   }
