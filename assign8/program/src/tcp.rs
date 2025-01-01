@@ -55,7 +55,7 @@ pub fn tcp_server(c: Chan<(), TCPServer>) -> Vec<Buffer> {
 
       match c.offer() {
         Branch::Left(c) => {
-          // Close connection
+          // Enter close phase
           let c = c.send(Ack);
           let c = c.send(Fin);
           let (c, ack) = c.recv();
@@ -78,18 +78,46 @@ pub fn tcp_server(c: Chan<(), TCPServer>) -> Vec<Buffer> {
   }
 }
 
-pub fn tcp_client(c: Chan<(), TCPClient>, bufs: Vec<Buffer>) {
-  // let mut c = c.send(Syn);
-  // let (mut c, syn_ack) = c.recv();
-  // c = c.send(Ack);
+/// Creates a vector of packets containing the data in `bufs`.
+/// For each packet, its `seqno` is its index in `bufs`.
+fn mk_packets(bufs: &Vec<Buffer>) -> Vec<Packet> {
+  let mut packets = vec![];
+  for (seqno, buffer) in bufs.iter().enumerate() {
+    let pk = Packet {
+      buf: buffer.to_vec(),
+      seqno,
+    };
+    packets.push(pk);
+  }
+  packets
+}
 
-  // for (seqno, buffer) in bufs.iter().enumerate() {
-  //   let packet = Packet {
-  //     buf: buffer.to_vec(),
-  //     seqno,
-  //   };
-  //   c.send(packet)
-  // }
+pub fn tcp_client(c: Chan<(), TCPClient>, bufs: Vec<Buffer>) {
+  // Handshake
+  let c = c.send(Syn);
+  let (c, syn_ack) = c.recv();
+  let c = c.send(Ack);
+
+  let mut c = c.rec_push();
+  loop {
+    c = {
+      // Data transfer process
+      let packets = mk_packets(&bufs);
+      let c = c.send(packets);
+      let (c, seq_nums) = c.recv();
+
+      if seq_nums.len() == bufs.len() {
+        // All packets received by server, enter close phase
+        let (c, ack) = c.left().recv();
+        let (c, fin) = c.recv();
+        c.send(Ack);
+        return;
+      } else {
+        // Re-send packets
+        c.right().rec_pop()
+      }
+    }
+  }
 }
 
 #[cfg(test)]
