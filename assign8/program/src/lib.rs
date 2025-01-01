@@ -1,9 +1,9 @@
 extern crate rand;
 
 // UNCOMMENT this when doing section 2
-// pub mod tcp;
+pub mod atm;
 mod backend;
 pub mod cart;
-
+pub mod echo_example;
 pub mod session;
-pub mod atm;
+pub mod tcp;

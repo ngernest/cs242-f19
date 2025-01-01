@@ -1,11 +1,11 @@
-use std::marker::PhantomData;
-use std::sync::mpsc::{channel, Sender, Receiver};
+use rand::{prelude::ThreadRng, thread_rng, Rng};
+use std::any::TypeId;
+use std::cell::RefCell;
 use std::marker;
+use std::marker::PhantomData;
 use std::mem::transmute;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::cell::RefCell;
-use rand::{thread_rng, prelude::ThreadRng, Rng};
-use std::any::TypeId;
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 thread_local!(static RNG: RefCell<ThreadRng> = RefCell::new(thread_rng()));
 thread_local!(pub static NOISY: AtomicBool = AtomicBool::new(false));
@@ -13,10 +13,12 @@ const DROP_PROB: f32 = 0.4;
 
 pub type Buffer = Vec<u8>;
 
+/// A `Packet` is a `buffer` along with the sequence no. (`seqno`)
+/// (i.e. its index in a list of packets that the client wants to send)
 #[derive(Debug, Clone)]
 pub struct Packet {
   pub buf: Buffer,
-  pub seqno: usize
+  pub seqno: usize,
 }
 
 pub struct Send<T, S>(PhantomData<(T, S)>);
@@ -37,21 +39,33 @@ impl HasDual for Close {
   type Dual = Close;
 }
 
-impl<T, S> HasDual for Send<T, S> where S: HasDual {
+impl<T, S> HasDual for Send<T, S>
+where
+  S: HasDual,
+{
   type Dual = Recv<T, S::Dual>;
 }
 
-impl<T, S> HasDual for Recv<T, S> where S: HasDual {
+impl<T, S> HasDual for Recv<T, S>
+where
+  S: HasDual,
+{
   type Dual = Send<T, S::Dual>;
 }
 
 impl<Left, Right> HasDual for Choose<Left, Right>
-where Left: HasDual, Right: HasDual {
+where
+  Left: HasDual,
+  Right: HasDual,
+{
   type Dual = Offer<Left::Dual, Right::Dual>;
 }
 
 impl<Left, Right> HasDual for Offer<Left, Right>
-where Left: HasDual, Right: HasDual {
+where
+  Left: HasDual,
+  Right: HasDual,
+{
   type Dual = Choose<Left::Dual, Right::Dual>;
 }
 
@@ -67,7 +81,10 @@ impl HasDual for Z {
   type Dual = Z;
 }
 
-impl<S> HasDual for Rec<S> where S: HasDual {
+impl<S> HasDual for Rec<S>
+where
+  S: HasDual,
+{
   type Dual = Rec<S::Dual>;
 }
 
@@ -116,28 +133,24 @@ where
   T: marker::Send + 'static,
 {
   pub fn recv(self) -> (Chan<Env, S>, T) {
-    NOISY.with(|noisy| {
-      unsafe {
-        let mut x = self.read();
-        if noisy.load(Ordering::SeqCst) &&
-          TypeId::of::<T>() == TypeId::of::<Vec<Packet>>()
-        {
-          let xmut = &mut x;
-          let xmut: &mut Vec<Packet> = transmute(xmut);
+    NOISY.with(|noisy| unsafe {
+      let mut x = self.read();
+      if noisy.load(Ordering::SeqCst) && TypeId::of::<T>() == TypeId::of::<Vec<Packet>>() {
+        let xmut = &mut x;
+        let xmut: &mut Vec<Packet> = transmute(xmut);
 
-          let mut rng = RNG.with(|gen| gen.borrow().clone());
-          let mut idx = (0..xmut.len())
-            .filter(|_| rng.gen_bool(DROP_PROB.into()))
-            .collect::<Vec<_>>();
-          idx.reverse();
+        let mut rng = RNG.with(|gen| gen.borrow().clone());
+        let mut idx = (0..xmut.len())
+          .filter(|_| rng.gen_bool(DROP_PROB.into()))
+          .collect::<Vec<_>>();
+        idx.reverse();
 
-          for i in idx {
-            xmut.remove(i);
-          }
+        for i in idx {
+          xmut.remove(i);
         }
-
-        (transmute(self), x)
       }
+
+      (transmute(self), x)
     })
   }
 }
@@ -175,7 +188,10 @@ impl<Env, Left, Right> Chan<Env, Offer<Left, Right>> {
   }
 }
 
-impl<S> Chan<(), S> where S: HasDual {
+impl<S> Chan<(), S>
+where
+  S: HasDual,
+{
   pub fn new() -> (Chan<(), S>, Chan<(), S::Dual>) {
     let (sender1, receiver1) = channel();
     let (sender2, receiver2) = channel();

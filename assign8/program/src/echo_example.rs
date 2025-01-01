@@ -1,4 +1,4 @@
-use session::*;
+use crate::session::*;
 
 type Server = Rec<Recv<String, Offer<Var<Z>, Close>>>;
 type Client = <Server as HasDual>::Dual;
@@ -29,4 +29,3 @@ fn client(c: Chan<(), Client>) {
     }
   }
 }
-
