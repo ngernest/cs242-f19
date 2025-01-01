@@ -43,7 +43,9 @@ fn order_ok_test() {
   let nonempty = nonempty.additem(1.0);
   let checkout = nonempty.checkout();
   match checkout.order() {
-    Ok(c) => { c.additem(1.0); }
+    Ok(c) => {
+      c.additem(1.0);
+    }
     Err(_) => {}
   }
 }
@@ -51,8 +53,7 @@ fn order_ok_test() {
 #[test]
 fn order_err_test() {
   // Get a cart after logging in
-  let empty = Cart::login(
-    "username".to_string(), "password".to_string()).unwrap();
+  let empty = Cart::login("username".to_string(), "password".to_string()).unwrap();
   // Cart becomes non empty after first item
   let nonempty = empty.additem(1.0);
   // Can continue adding items to cart
