@@ -1,0 +1,7 @@
+warning: `$DIR/target/tests/assign8/.cargo/config` is deprecated in favor of `config.toml`
+note: if you need to support cargo 1.38 or earlier, you can symlink `config` to `config.toml`
+error[E0599]: no method named `checkout` found for struct `assign8::cart::Empty` in the current scope
+ --> $DIR/fail1.rs:7:9
+  |
+7 |   empty.checkout();
+  |         ^^^^^^^^ method not found in `Empty`
