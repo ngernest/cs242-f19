@@ -11,6 +11,10 @@ thread_local!(static RNG: RefCell<ThreadRng> = RefCell::new(thread_rng()));
 thread_local!(pub static NOISY: AtomicBool = AtomicBool::new(false));
 const DROP_PROB: f32 = 0.4;
 
+/* -------------------------------------------------------------------------- */
+/*                                 TCP Packets                                */
+/* -------------------------------------------------------------------------- */
+
 pub type Buffer = Vec<u8>;
 
 /// A `Packet` is a `buffer` along with the sequence no. (`seqno`)
@@ -20,6 +24,10 @@ pub struct Packet {
   pub buf: Buffer,
   pub seqno: usize,
 }
+
+/* -------------------------------------------------------------------------- */
+/*                                Session Types                               */
+/* -------------------------------------------------------------------------- */
 
 pub struct Send<T, S>(PhantomData<(T, S)>);
 pub struct Recv<T, S>(PhantomData<(T, S)>);
@@ -34,6 +42,10 @@ pub struct S<N>(PhantomData<N>);
 
 /// De Bruijn indices, where `N` is a Peano numeral
 pub struct Var<N>(PhantomData<N>);
+
+/* -------------------------------------------------------------------------- */
+/*                             `HasDual` instances                            */
+/* -------------------------------------------------------------------------- */
 
 pub trait HasDual {
   type Dual;
@@ -92,15 +104,23 @@ where
   type Dual = Rec<S::Dual>;
 }
 
+/* -------------------------------------------------------------------------- */
+/*                           Session-typed Channels                           */
+/* -------------------------------------------------------------------------- */
+
 /// Channels are parameterized by an environment `Env` and a session type `S`
 /// (`Env` is a mapping from De Bruijn indices to session types)
 pub struct Chan<Env, S> {
+  /// The `sender` sends messages to the counterparty
   pub sender: Sender<Box<u8>>,
+
+  /// The `receiver` receives messages
   pub receiver: Receiver<Box<u8>>,
   pub _data: PhantomData<(Env, S)>,
 }
 
 impl<Env, S> Chan<Env, S> {
+  /// Takes a `T`, converts it to a blob of bits, and sends it to the receiver
   unsafe fn write<T>(&self, x: T)
   where
     T: marker::Send + 'static,
@@ -109,6 +129,7 @@ impl<Env, S> Chan<Env, S> {
     sender.send(Box::new(x)).unwrap();
   }
 
+  /// Receives a blob of bits and converts it into a `T`
   unsafe fn read<T>(&self) -> T
   where
     T: marker::Send + 'static,
@@ -126,9 +147,15 @@ impl<Env, T, S> Chan<Env, Send<T, S>>
 where
   T: marker::Send + 'static,
 {
+  /// When we have a channel w/ session type `Send<T, S>`,
+  /// we can `send` a `T` & get a channel of type `Chan<S>`,
+  /// where `S` is the rest of the session type
   pub fn send(self, x: T) -> Chan<Env, S> {
     unsafe {
+      // Actually send the bits over
       self.write(x);
+
+      // Call `transmute` to transform `Chan<Send<T, S>>` into `Chan<S>`
       transmute(self)
     }
   }
@@ -138,6 +165,8 @@ impl<Env, T, S> Chan<Env, Recv<T, S>>
 where
   T: marker::Send + 'static,
 {
+  /// Reads a value of type `T`, then calls `transmute` to transform the channel
+  /// `Chan<Recv<T, S>>` into `Chan<S>`
   pub fn recv(self) -> (Chan<Env, S>, T) {
     NOISY.with(|noisy| unsafe {
       let mut x = self.read();
@@ -164,6 +193,7 @@ where
 impl<Env, Left, Right> Chan<Env, Choose<Left, Right>> {
   pub fn left(self) -> Chan<Env, Left> {
     unsafe {
+      // We send `true` to indicate we've chosen the `left` branch
       self.write(true);
       transmute(self)
     }
@@ -171,6 +201,7 @@ impl<Env, Left, Right> Chan<Env, Choose<Left, Right>> {
 
   pub fn right(self) -> Chan<Env, Right> {
     unsafe {
+      // We send `false` to indicate we've chosen the `right` branch
       self.write(false);
       transmute(self)
     }
@@ -198,6 +229,8 @@ impl<S> Chan<(), S>
 where
   S: HasDual,
 {
+  /// Creates a pair of new channels (one for sending, one for receiving).
+  /// Both channels are initialized with the empty environment `()`
   pub fn new() -> (Chan<(), S>, Chan<(), S::Dual>) {
     let (sender1, receiver1) = channel();
     let (sender2, receiver2) = channel();
