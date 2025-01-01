@@ -45,30 +45,34 @@ pub fn tcp_server(c: Chan<(), TCPServer>) -> Vec<Buffer> {
   let (c, ack) = c.recv();
 
   // Data transfer
-  let c = c.rec_push();
+  let mut c = c.rec_push();
   loop {
-    let (c, mut packets) = c.recv();
-    let seq_nums = get_seq_nums(&packets);
-    let c = c.send(seq_nums);
+    c = {
+      // Data transfer process
+      let (c, mut packets) = c.recv();
+      let seq_nums = get_seq_nums(&packets);
+      let c = c.send(seq_nums);
 
-    match c.offer() {
-      Branch::Left(c) => {
-        // Close connection
-        let c = c.send(Ack);
-        let c = c.send(Fin);
-        let (c, ack) = c.recv();
-        c.close();
+      match c.offer() {
+        Branch::Left(c) => {
+          // Close connection
+          let c = c.send(Ack);
+          let c = c.send(Fin);
+          let (c, ack) = c.recv();
+          c.close();
 
-        // Sort packets in increasing order of `seqno`
-        packets.sort_by(|p1, p2| p1.seqno.cmp(&p2.seqno));
+          // Sort packets in increasing order of `seqno`
+          packets.sort_by(|p1, p2| p1.seqno.cmp(&p2.seqno));
 
-        // Project out all the buffers
-        let buffers = get_buffers(&packets);
-        return buffers;
-      }
-      Branch::Right(c) => {
-        // Recurse
-        todo!()
+          // Project out all the buffers
+          let buffers = get_buffers(&packets);
+          return buffers;
+        }
+        Branch::Right(c) => {
+          // Restart data transfer process
+          // Recurse by popping a session type off the `Env` stakc
+          c.rec_pop()
+        }
       }
     }
   }
