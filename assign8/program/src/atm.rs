@@ -1,20 +1,14 @@
-use session::*;
+use crate::session::*;
 
 type Id = String;
 type AtmDeposit = Recv<u64, Send<u64, Var<Z>>>;
 type AtmWithdraw = Recv<u64, Choose<Var<Z>, Close>>;
-type AtmServer =
-  Recv<Id,
-  Choose<
-    Rec<
-      Offer<Offer<
-        AtmDeposit,
-        AtmWithdraw>,
-        Close>>,
-    Close>>;
+type AtmServer = Recv<Id, Choose<Rec<Offer<Offer<AtmDeposit, AtmWithdraw>, Close>>, Close>>;
 type AtmClient = <AtmServer as HasDual>::Dual;
 
-fn approved(_id: &str) -> bool { true }
+fn approved(_id: &str) -> bool {
+  true
+}
 
 pub fn atm_server(c: Chan<(), AtmServer>) {
   let (c, id) = c.recv();
@@ -28,14 +22,18 @@ pub fn atm_server(c: Chan<(), AtmServer>) {
   let mut c = c.rec_push();
   loop {
     c = match c.offer() {
-      Branch::Left(c) =>  // Deposit or withdraw
+      Branch::Left(c) =>
+      // Deposit or withdraw
+      {
         match c.offer() {
-          Branch::Left(c) => { // Deposit
+          Branch::Left(c) => {
+            // Deposit
             let (c, amt) = c.recv();
             balance += amt;
             c.send(balance).rec_pop()
           }
-          Branch::Right(c) => { // Withdraw
+          Branch::Right(c) => {
+            // Withdraw
             let (c, amt) = c.recv();
             if balance >= amt {
               balance -= amt;
@@ -45,8 +43,12 @@ pub fn atm_server(c: Chan<(), AtmServer>) {
               return;
             }
           }
-        },
-      Branch::Right(c) => { c.close(); return; } // Exit loop
+        }
+      }
+      Branch::Right(c) => {
+        c.close();
+        return;
+      } // Exit loop
     }
   }
 }

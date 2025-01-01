@@ -2,6 +2,7 @@
 name = "assign8"
 version = "0.1.0"
 authors = ["Will Crichton <wcrichto@cs.stanford.edu>"]
+edition = "2021"
 
 [dependencies]
 rand = "0.6.0-pre.1"
